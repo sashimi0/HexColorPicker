@@ -10,8 +10,8 @@ import UIKit
 class ViewController: UIViewController {
 
     @IBOutlet weak var hueSlider: UISlider!
-    @IBOutlet weak var selectedColorView: UIView!      // The 2D gradient picker square
-    @IBOutlet weak var colorPreviewView: UIView!       // The small view showing final color
+    @IBOutlet weak var selectedColorView: UIView!
+    @IBOutlet weak var colorPreviewView: UIView!
     @IBOutlet weak var hexLabel: UILabel!
     @IBOutlet weak var resetButton: UIButton!
 
@@ -100,10 +100,13 @@ class ViewController: UIViewController {
         satGradient.startPoint = CGPoint(x: 0, y: 0.5)
         satGradient.endPoint = CGPoint(x: 1, y: 0.5)
 
-        // Vertical: transparent → black (brightness)
+        // Vertical: black alpha 0 → black alpha 1 (brightness/darkness)
         let brightnessGradient = CAGradientLayer()
         brightnessGradient.frame = selectedColorView.bounds
-        brightnessGradient.colors = [UIColor.clear.cgColor, UIColor.black.cgColor]
+        brightnessGradient.colors = [
+            UIColor.black.withAlphaComponent(0.0).cgColor,
+            UIColor.black.withAlphaComponent(1.0).cgColor
+        ]
         brightnessGradient.startPoint = CGPoint(x: 0.5, y: 0)
         brightnessGradient.endPoint = CGPoint(x: 0.5, y: 1)
 
@@ -126,27 +129,10 @@ class ViewController: UIViewController {
     }
 
     private func getColor(in view: UIView, at point: CGPoint) -> UIColor {
-        guard view.bounds.width > 0 && view.bounds.height > 0 else { return .white }
-
-        UIGraphicsBeginImageContextWithOptions(view.bounds.size, false, 0)
-        view.layer.render(in: UIGraphicsGetCurrentContext()!)
-        let bitmap = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-
-        guard let pixelData = bitmap?.cgImage?.dataProvider?.data else { return .white }
-        let data: UnsafePointer<UInt8> = CFDataGetBytePtr(pixelData)!
-
-        let bytesPerPixel = 4
-        let bytesPerRow = bitmap!.cgImage!.bytesPerRow
-        let x = Int(point.x)
-        let y = Int(point.y)
-        let pixelIndex = (bytesPerRow * y) + x * bytesPerPixel
-
-        let r = CGFloat(data[pixelIndex]) / 255.0
-        let g = CGFloat(data[pixelIndex + 1]) / 255.0
-        let b = CGFloat(data[pixelIndex + 2]) / 255.0
-
-        return UIColor(red: r, green: g, blue: b, alpha: 1.0)
+        let saturation = min(max(point.x / view.bounds.width, 0), 1)
+        let brightness = 1 - min(max(point.y / view.bounds.height, 0), 1)
+        let hue = CGFloat(hueSlider.value)
+        return UIColor(hue: hue, saturation: saturation, brightness: brightness, alpha: 1.0)
     }
 
     @objc private func copyHexToClipboard() {
@@ -167,7 +153,7 @@ class ViewController: UIViewController {
     }
 }
 
-// UIColor extension for hex conversion
+
 extension UIColor {
     func toHexString() -> String {
         var r: CGFloat = 0
