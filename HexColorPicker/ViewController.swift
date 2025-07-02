@@ -19,13 +19,7 @@ class ViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        assert(hueSlider != nil, "hueSlider not connected!")
-        assert(selectedColorView != nil, "selectedColorView not connected!")
-        assert(colorPreviewView != nil, "colorPreviewView not connected!")
-        assert(hexLabel != nil, "hexLabel not connected!")
-        assert(resetButton != nil, "resetButton not connected!")
-
+        
         setupHueSlider()
         setupSelectedColorView()
         setupColorPreviewView()
