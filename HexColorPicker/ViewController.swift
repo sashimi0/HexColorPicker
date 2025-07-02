@@ -10,25 +10,39 @@ import UIKit
 class ViewController: UIViewController {
 
     @IBOutlet weak var hueSlider: UISlider!
-    @IBOutlet weak var selectedColorView: UIView!
+    @IBOutlet weak var selectedColorView: UIView!      // The 2D gradient picker square
     @IBOutlet weak var colorPreviewView: UIView!       // The small view showing final color
     @IBOutlet weak var hexLabel: UILabel!
     @IBOutlet weak var resetButton: UIButton!
 
+    private var indicatorView: UIView!
+
     override func viewDidLoad() {
         super.viewDidLoad()
+
+        assert(hueSlider != nil, "hueSlider not connected!")
+        assert(selectedColorView != nil, "selectedColorView not connected!")
+        assert(colorPreviewView != nil, "colorPreviewView not connected!")
+        assert(hexLabel != nil, "hexLabel not connected!")
+        assert(resetButton != nil, "resetButton not connected!")
+
         setupHueSlider()
         setupSelectedColorView()
         setupColorPreviewView()
         setupGestures()
+        setupIndicator()
         resetColor()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateSelectedColorGradient(hue: CGFloat(hueSlider.value))
     }
 
     private func setupHueSlider() {
         hueSlider.minimumValue = 0.0
         hueSlider.maximumValue = 1.0
         hueSlider.value = 0.0
-        updateSelectedColorGradient(hue: CGFloat(hueSlider.value))
     }
 
     private func setupSelectedColorView() {
@@ -42,6 +56,16 @@ class ViewController: UIViewController {
         colorPreviewView.layer.borderWidth = 1
         colorPreviewView.layer.cornerRadius = 8
         colorPreviewView.backgroundColor = .white
+    }
+
+    private func setupIndicator() {
+        indicatorView = UIView(frame: CGRect(x: 0, y: 0, width: 20, height: 20))
+        indicatorView.layer.cornerRadius = 10
+        indicatorView.layer.borderColor = UIColor.black.cgColor
+        indicatorView.layer.borderWidth = 1
+        indicatorView.backgroundColor = .clear
+        indicatorView.isHidden = true
+        selectedColorView.addSubview(indicatorView)
     }
 
     private func setupGestures() {
@@ -58,39 +82,52 @@ class ViewController: UIViewController {
     }
 
     private func updateSelectedColorGradient(hue: CGFloat) {
+        guard selectedColorView.bounds.width > 0 && selectedColorView.bounds.height > 0 else { return }
+
         let hueColor = UIColor(hue: hue, saturation: 1, brightness: 1, alpha: 1)
 
-        selectedColorView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        // Remove only gradient layers to avoid deleting indicator
+        selectedColorView.layer.sublayers?.forEach { layer in
+            if layer is CAGradientLayer {
+                layer.removeFromSuperlayer()
+            }
+        }
 
-        // 1) Horizontal: white → hue (saturation)
+        // Horizontal: white → hue (saturation)
         let satGradient = CAGradientLayer()
         satGradient.frame = selectedColorView.bounds
         satGradient.colors = [UIColor.white.cgColor, hueColor.cgColor]
         satGradient.startPoint = CGPoint(x: 0, y: 0.5)
         satGradient.endPoint = CGPoint(x: 1, y: 0.5)
 
-        // 2) Vertical: transparent → black (brightness)
+        // Vertical: transparent → black (brightness)
         let brightnessGradient = CAGradientLayer()
         brightnessGradient.frame = selectedColorView.bounds
         brightnessGradient.colors = [UIColor.clear.cgColor, UIColor.black.cgColor]
         brightnessGradient.startPoint = CGPoint(x: 0.5, y: 0)
         brightnessGradient.endPoint = CGPoint(x: 0.5, y: 1)
 
-        selectedColorView.layer.addSublayer(satGradient)
-        selectedColorView.layer.addSublayer(brightnessGradient)
+        selectedColorView.layer.insertSublayer(satGradient, below: indicatorView.layer)
+        selectedColorView.layer.insertSublayer(brightnessGradient, below: indicatorView.layer)
     }
 
     @objc private func handlePickerPan(_ gesture: UIPanGestureRecognizer) {
         let point = gesture.location(in: selectedColorView)
         let clampedX = max(0, min(point.x, selectedColorView.bounds.width - 1))
         let clampedY = max(0, min(point.y, selectedColorView.bounds.height - 1))
-        let pickedColor = getColor(in: selectedColorView, at: CGPoint(x: clampedX, y: clampedY))
+        let clampedPoint = CGPoint(x: clampedX, y: clampedY)
 
+        indicatorView.center = clampedPoint
+        indicatorView.isHidden = false
+
+        let pickedColor = getColor(in: selectedColorView, at: clampedPoint)
         hexLabel.text = pickedColor.toHexString()
         colorPreviewView.backgroundColor = pickedColor
     }
 
     private func getColor(in view: UIView, at point: CGPoint) -> UIColor {
+        guard view.bounds.width > 0 && view.bounds.height > 0 else { return .white }
+
         UIGraphicsBeginImageContextWithOptions(view.bounds.size, false, 0)
         view.layer.render(in: UIGraphicsGetCurrentContext()!)
         let bitmap = UIGraphicsGetImageFromCurrentImageContext()
@@ -126,6 +163,7 @@ class ViewController: UIViewController {
         updateSelectedColorGradient(hue: 0.0)
         hexLabel.text = "#FFFFFF"
         colorPreviewView.backgroundColor = .white
+        indicatorView.isHidden = true
     }
 }
 
